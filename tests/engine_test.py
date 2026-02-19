@@ -217,6 +217,36 @@ class TestGameTheoryEngine(unittest.TestCase):
         self.assertEqual(self.engine._abstract_to_concrete(sh_game, "C"), "Stag")
         self.assertEqual(self.engine._concrete_to_abstract(sh_game, "Hare"), "D")
 
+    def test_load_batch_config(self):
+        """Test batch parser for json/yaml , game abbrev , defaults , safe errors."""
+        # Mock json content
+        mock_json = '{"game": "hd", "sim_type": 1, "strat1": "TitForTat", "strat2": "AlwaysDefect"}'
+        with patch("engine.open", mock_open(read_data=mock_json)) as m:
+            spec = self.engine.load_batch_config("test.json")
+            self.assertEqual(spec["game"], "HawkDove")  # abbrev resolved
+            self.assertEqual(spec["sim_type"], 1)
+        # YAML
+        mock_yaml = "game: pd\nsim_type: 2\nrounds_per_match: 10"
+        with patch("engine.open", mock_open(read_data=mock_yaml)):
+            spec = self.engine.load_batch_config("test.yaml")
+            self.assertEqual(spec["game"], "PD")
+        # Error cases
+        with self.assertRaises(FileNotFoundError):
+            self.engine.load_batch_config("nonexistent.json")
+        with self.assertRaises(ValueError):  # bad format
+            self.engine.load_batch_config("bad.txt")
+
+    @patch("engine.GameTheoryEngine._play_match")
+    def test_custom_strat_in_sim(self, mock_play):
+        """Test custom ForgivingTitForTat (from custom/) used in repeated match."""
+        mock_play.return_value = {"scores": (100, 50)}
+        # Uses registry-loaded custom strat
+        result = self.engine.repeated_match(
+            strat1_name="ForgivingTitForTat", strat2_name="AlwaysDefect", rounds=5, noise=0
+        )
+        mock_play.assert_called()
+        self.assertEqual(result["scores"], (100, 50))  # from mock
+
     @unittest.skipIf(
         importlib.util.find_spec("deap") is None,
         "DEAP not installed (skip evo test; run with venv/bin/python or pip install -r requirements.txt)"
