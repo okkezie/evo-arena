@@ -1,0 +1,9 @@
+{
+  "game": "pd",
+  "sim_type": 1,
+  "strat1": "TitForTat",
+  "strat2": "AlwaysDefect",
+  "rounds": 10,
+  "noise": 0.0,
+  "description": "Example: single repeated PD match (AI vs AI, no noise)"
+}

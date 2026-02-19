@@ -1,0 +1,7 @@
+# Example: round-robin tournament on Hawk-Dove (all strats, with noise)
+game: hd  # abbrev supported
+sim_type: 2
+rounds_per_match: 50
+repeats: 1
+noise: 0.1
+description: Example: tournament on Hawk-Dove (suppressed output, ranked leaderboard)

@@ -1,4 +1,5 @@
 import sys
+import argparse
 from engine import GameTheoryEngine
 
 def select_strategy(available_strats: list[str], player_label: str = "") -> str:
@@ -28,13 +29,32 @@ def select_strategy(available_strats: list[str], player_label: str = "") -> str:
 if __name__ == "__main__":
     """
     Console menu for EvoArena.
-    - Game selection from config.json
-    - Sim type: basic (orig human/AI), repeated match, round-robin tournament, evolutionary (DEAP)
-    - Params prompts for new sims: strats, rounds, noise (0-0.2), tourn repeats, pop/gens for evo
-    - Calls engine methods; graceful errors
+    - Interactive menu (no args)
+    - Batch: python main.py -f <config.json/yaml> (or 'run -f' via subcommand; bypasses menu)
+    - Supports abbrev games, full sims from file.
     """
-    print("=== EvoArena: Game Theory Simulator ===")
-    engine = GameTheoryEngine()
+    # CLI for batch mode
+    parser = argparse.ArgumentParser(description="EvoArena: Game Theory Simulator")
+    parser.add_argument(
+        "-f", "--file", help="Path to batch config (.json/.yaml) for non-interactive run"
+    )
+    # Optional subcommand for 'run'
+    subparsers = parser.add_subparsers(dest="command")
+    run_p = subparsers.add_parser("run", help="Non-interactive batch run")
+    run_p.add_argument("-f", "--file", required=True, help="Config file")
+    args = parser.parse_args()
+
+    # Batch if --file given (CLI or sub), else interactive menu
+    if args.file or (hasattr(args, "command") and args.command == "run" and args.file):
+        file_path = args.file
+        print(f"=== EvoArena Batch Mode: {file_path} ===")
+        engine = GameTheoryEngine()
+        engine.run_from_config(file_path)
+        sys.exit(0)  # bypass interactive menu
+    else:
+        # Fallback to original interactive menu
+        print("=== EvoArena: Game Theory Simulator (Interactive) ===")
+        engine = GameTheoryEngine()
 
     # Game selection (extensible via config.json; now supports PD, Hawk-Dove, Stag Hunt)
     # Accepts full name, initials/abbrev (case-insensitive, e.g., pd/HD/sh/stag hunt)

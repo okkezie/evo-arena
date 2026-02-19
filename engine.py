@@ -1,11 +1,25 @@
 import json
 import random
+import yaml
+import os
+from pathlib import Path
 from typing import Any, Dict, List, Tuple, Optional
 from games import Game
 from strategies import STRATEGY_REGISTRY, Strategy
 
 # For advanced simulations (DEAP/numpy/matplotlib): lazily imported inside evolutionary_simulation()
 # to avoid import errors on minimal envs (see requirements.txt + venv).
+
+# Shared game abbrev map (used in menu/parser for initials/full names)
+GAME_ABBREV_MAP = {
+    # PD
+    "pd": "PD", "prisoners": "PD", "prisonersdilemma": "PD",
+    # Hawk-Dove
+    "hd": "HawkDove", "hawkdove": "HawkDove", "hawk": "HawkDove", "dove": "HawkDove",
+    # Stag Hunt
+    "sh": "StagHunt", "stag": "StagHunt", "staghunt": "StagHunt", "stag hunt": "StagHunt",
+    "stag-hunt": "StagHunt", "hare": "StagHunt",
+}
 
 class GameTheoryEngine:
     """
@@ -443,3 +457,96 @@ class GameTheoryEngine:
                 print(f"Plot skipped (e.g., headless): {e}")
 
         return {"final_ranking": ranked_final, "winner": winner, "freq_history": freq_history}
+
+    def load_batch_config(self, file_path: str) -> Dict[str, Any]:
+        """
+        Parse batch run spec from .json or .yaml file.
+        - Supports abbrev game (pd/hd/sh), defaults, validation.
+        - Safe errors for missing/invalid files/fields.
+        - Used by run_from_config for non-interactive CLI.
+        """
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Batch config file not found: {file_path}")
+        path = Path(file_path)
+        ext = path.suffix.lower()
+        try:
+            with open(file_path, "r") as f:
+                if ext == ".json":
+                    spec = json.load(f)
+                elif ext in (".yaml", ".yml"):
+                    spec = yaml.safe_load(f)
+                else:
+                    raise ValueError(f"Unsupported format: {ext} (use .json/.yaml)")
+        except Exception as e:
+            raise ValueError(f"Parse error in {file_path}: {e}") from e
+
+        # Required fields
+        if "game" not in spec or "sim_type" not in spec:
+            raise ValueError(f"Missing 'game' or 'sim_type' in {file_path}")
+
+        # Normalize game abbrev (reuse map)
+        game = str(spec["game"])
+        norm = game.lower().replace(" ", "").replace("-", "").replace("_", "").replace("'", "")
+        if norm in GAME_ABBREV_MAP:
+            spec["game"] = GAME_ABBREV_MAP[norm]
+        if spec["game"] not in self.games:
+            raise ValueError(f"Invalid game '{spec['game']}' in {file_path}. Available: {list(self.games.keys())}")
+
+        # Defaults + basic validate
+        spec.setdefault("rounds", self.default_rounds)
+        spec.setdefault("noise", 0.0)
+        spec.setdefault("plot", True)
+        if not 0 <= spec.get("noise", 0) <= 0.2:
+            raise ValueError(f"Noise must be 0-0.2 in {file_path}")
+        # sim_type 0-3 , strats exist etc. (lazy in dispatch)
+
+        print(f"Loaded batch config: {spec.get('description', file_path)}")
+        return spec
+
+    def run_from_config(self, file_path: str) -> Any:
+        """
+        Run simulation from batch config file (non-interactive).
+        Dispatches to appropriate sim method based on spec['sim_type'].
+        Bypasses menu for automation/CI.
+        """
+        spec = self.load_batch_config(file_path)
+        game = spec["game"]
+        sim_type = spec.get("sim_type", 0)
+        print(f"\n=== Batch Run from {file_path} (sim_type={sim_type}, game={game}) ===")
+
+        if sim_type == 0:
+            # Basic (e.g., auto AI)
+            mode = spec.get("mode", 0)
+            strat1 = spec.get("strat1")
+            strat2 = spec.get("strat2")
+            rounds = spec.get("rounds")
+            return self.play_game(game, mode, strat1, strat2, rounds)
+        elif sim_type == 1:
+            # Repeated match
+            return self.repeated_match(
+                game,
+                spec.get("strat1", "TitForTat"),
+                spec.get("strat2", "AlwaysDefect"),
+                spec.get("rounds", 100),
+                spec.get("noise", 0.0),
+            )
+        elif sim_type == 2:
+            # Tournament
+            return self.round_robin_tournament(
+                game,
+                spec.get("rounds_per_match", 100),
+                spec.get("repeats", 1),
+                spec.get("noise", 0.0),
+            )
+        elif sim_type == 3:
+            # Evo
+            return self.evolutionary_simulation(
+                game,
+                spec.get("pop_size", 100),
+                spec.get("generations", 30),
+                spec.get("rounds_per_match", 50),
+                spec.get("noise", 0.0),
+                spec.get("plot", True),
+            )
+        else:
+            raise ValueError(f"Invalid sim_type {sim_type} in {file_path} (0-3 expected)")

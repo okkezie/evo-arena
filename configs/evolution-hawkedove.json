@@ -1,0 +1,10 @@
+{
+  "game": "HawkDove",
+  "sim_type": 3,
+  "pop_size": 50,
+  "generations": 20,
+  "rounds_per_match": 20,
+  "noise": 0.0,
+  "plot": true,
+  "description": "Example: DEAP evolution on Hawk-Dove (small pop for speed)"
+}

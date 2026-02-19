@@ -64,11 +64,19 @@ Select in menu; outputs use game-specific labels; strats map semantically (C=coo
   - Repeated: sim=1, strats=TitForTat/AlwaysDefect, noise=0.1
   - Tournament: sim=2, repeats=1
   - Evo: sim=3, pop=50, gens=20 (check plot/stats)
-- **Edge Cases**: noise>0.2 error, small pop for evo, invalid strats, missing DEAP
+- **Batch/CLI Tests**: `python main.py -f configs/single-match-PD.json` (check output); invalid file errors
+- **Edge Cases**: noise>0.2 error, small pop for evo, invalid strats, missing DEAP, bad batch config
 - Unit tests now cover: `venv/bin/python -m unittest tests.games_test tests.strategies_test tests.engine_test`
   (evo test auto-skips if DEAP absent; other tests pass on base Python)
 - Always run in venv: `source venv/bin/activate && python main.py` (or `venv/bin/python main.py`)
   - Fixes ModuleNotFoundError for deap; see requirements.txt setup
+
+## Batch Mode (Non-Interactive)
+CLI for automation:
+- `python main.py -f configs/single-match-PD.json` (or `run -f`)
+- `python main.py -f configs/tournament-all.yaml`
+- `python main.py -f configs/evolution-hawkedove.json`
+- Supports abbrev games , full specs; see configs/ examples , parser in engine.py
 
 ## Extensibility
 - Add new games: Extend `"games"` section in `config.json` with payoffs and valid_actions
