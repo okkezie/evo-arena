@@ -4,10 +4,8 @@ from typing import Any, Dict, List, Tuple, Optional
 from games import Game
 from strategies import STRATEGY_REGISTRY, Strategy
 
-# For advanced simulations
-from deap import base, creator, tools
-import numpy as np
-import matplotlib.pyplot as plt
+# For advanced simulations (DEAP/numpy/matplotlib): lazily imported inside evolutionary_simulation()
+# to avoid import errors on minimal envs (see requirements.txt + venv).
 
 class GameTheoryEngine:
     """
@@ -267,9 +265,23 @@ class GameTheoryEngine:
         - Pop of strategy types, fitness via mini-tournaments.
         - Std ops; per-gen stats/freqs; final rank + optional plot.
         - Tuned small for speed (short matches, sampled fitness).
+        - Requires: deap, numpy, matplotlib (pip install -r requirements.txt; use venv).
         """
         print(f"\n--- Evolutionary Simulation | Pop={pop_size}, Gens={generations}, Noise={noise} ---")
-        # DEAP setup (handle re-runs)
+
+        # Lazy import for DEAP/numpy/matplotlib (avoids ModuleNotFound on base Python envs;
+        # only needed for this feature. See README/requirements.txt + venv setup.)
+        try:
+            from deap import base, creator, tools
+            import numpy as np
+            import matplotlib.pyplot as plt
+        except ImportError as e:
+            raise ImportError(
+                "DEAP, numpy, and matplotlib are required for evolutionary simulations. "
+                "Install with: source venv/bin/activate && pip install -r requirements.txt"
+            ) from e
+
+        # DEAP setup (handle re-runs in same process)
         try:
             creator.create("FitnessMax", base.Fitness, weights=(1.0,))
             creator.create("Individual", list, fitness=creator.FitnessMax)

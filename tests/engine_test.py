@@ -2,6 +2,7 @@ import unittest
 import os
 import sys
 import json
+import importlib.util
 from unittest.mock import patch, mock_open
 
 # Add parent directory to path for imports
@@ -32,8 +33,9 @@ class TestGameTheoryEngine(unittest.TestCase):
             "strategies": ["AlwaysCooperate", "AlwaysDefect", "TitForTat", "GrimTrigger"],
             "default_rounds": 2  # Small for fast tests
         }
-        # Patch open and json.load for config
-        self.config_patcher = patch('builtins.open', mock_open(read_data=json.dumps(self.mock_config)))
+        # Patch open *in engine module* (module-specific to avoid leaking to matplotlib/DEAP/etc.)
+        # This prevents mock config data from corrupting other libs' file reads (e.g., matplotlibrc parse)
+        self.config_patcher = patch('engine.open', mock_open(read_data=json.dumps(self.mock_config)))
         self.mock_file = self.config_patcher.start()
         self.engine = GameTheoryEngine(config_path='config.json')  # uses mock
 
@@ -169,10 +171,16 @@ class TestGameTheoryEngine(unittest.TestCase):
         # Called 4*4 =16 times (full matrix)
         self.assertEqual(mock_match.call_count, 16)
 
+    @unittest.skipIf(
+        importlib.util.find_spec("deap") is None,
+        "DEAP not installed (skip evo test; run with venv/bin/python or pip install -r requirements.txt)"
+    )
     @patch('matplotlib.pyplot.show')
     @patch('engine.GameTheoryEngine._play_match')
     def test_evolutionary_simulation(self, mock_match, mock_plot):
-        """Test DEAP evo: runs GA, stats, freqs, plot; small params for speed."""
+        """Test DEAP evo: runs GA, stats, freqs, plot; small params for speed.
+        Skipped on minimal envs without DEAP (other tests always pass).
+        """
         # Mock match returns positive score
         mock_match.return_value = {"scores": (100, 0)}
         result = self.engine.evolutionary_simulation(

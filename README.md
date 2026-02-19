@@ -53,13 +53,15 @@ Run via `python main.py` and select sim type:
 - Tuned for speed (short matches, sampling)
 
 ## Updated Testing Guide
-- **New Features Console Tests**:
+- **New Features Console Tests** (use venv for DEAP/numpy/matplotlib):
   - Repeated: sim=1, strats=TitForTat/AlwaysDefect, noise=0.1
   - Tournament: sim=2, repeats=1
   - Evo: sim=3, pop=50, gens=20 (check plot/stats)
-- **Edge Cases**: noise>0.2 error, small pop for evo, invalid strats
-- Unit tests now cover: `python -m unittest tests.engine_test` (noise, sims)
-- Run in venv: `source venv/bin/activate && python main.py`
+- **Edge Cases**: noise>0.2 error, small pop for evo, invalid strats, missing DEAP
+- Unit tests now cover: `venv/bin/python -m unittest tests.games_test tests.strategies_test tests.engine_test`
+  (evo test auto-skips if DEAP absent; other tests pass on base Python)
+- Always run in venv: `source venv/bin/activate && python main.py` (or `venv/bin/python main.py`)
+  - Fixes ModuleNotFoundError for deap; see requirements.txt setup
 
 ## Extensibility
 - Add new games: Extend `"games"` section in `config.json` with payoffs and valid_actions
