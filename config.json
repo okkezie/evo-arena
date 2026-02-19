@@ -1,0 +1,15 @@
+{
+  "games": {
+    "PD": {
+      "payoffs": {
+        "('C', 'C')": [3, 3],
+        "('C', 'D')": [0, 5],
+        "('D', 'C')": [5, 0],
+        "('D', 'D')": [1, 1]
+      },
+      "valid_actions": ["C", "D"]
+    }
+  },
+  "strategies": ["AlwaysCooperate", "AlwaysDefect", "TitForTat", "GrimTrigger"],
+  "default_rounds": 10
+}
