@@ -72,5 +72,9 @@ Select in menu; outputs use game-specific labels; strats map semantically (C=coo
 
 ## Extensibility
 - Add new games: Extend `"games"` section in `config.json` with payoffs and valid_actions
-- New strategies: Implement subclass of `Strategy` in `strategies.py` and register in `STRATEGY_REGISTRY`
+- **Folder-based strategies**: 
+  - system/ : built-in (AlwaysCooperate etc.; auto-loaded)
+  - custom/ : user strategies (e.g., ForgivingTitForTat.py ; auto-discovered)
+  - Startup: dynamic registry via pkgutil/importlib (see strategies/registry.py)
+  - Menu: full list , name/# select ; duplicates/errors skipped
 - DEAP evolution: Customize toolbox/ fitness in engine.evolutionary_simulation for advanced (e.g., more complex GA)

@@ -20,7 +20,9 @@ class GameTheoryEngine:
         self.games: Dict[str, Game] = {}
         for name, data in self.config['games'].items():
             self.games[name] = Game.from_config(data)
-        self.strategy_names: List[str] = self.config['strategies']
+        # Strategy names from dynamic registry (system/ + custom/ folders)
+        # Overrides config['strategies'] for full auto-loaded list
+        self.strategy_names: List[str] = sorted(STRATEGY_REGISTRY.keys())
         self.default_rounds: int = self.config.get('default_rounds', 10)
 
     def _get_strategy(self, name: str) -> Strategy:

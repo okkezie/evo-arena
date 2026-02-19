@@ -76,7 +76,11 @@ class TestGameTheoryEngine(unittest.TestCase):
         self.assertIsInstance(self.engine.games["HawkDove"], Game)
         self.assertIn("PD test", self.engine.games["PD"].description)
         self.assertIn("HD test", self.engine.games["HawkDove"].description)
-        self.assertEqual(self.engine.strategy_names, self.mock_config["strategies"])
+        # strategy_names now from dynamic registry (system/ + custom/ForgivingTitForTat)
+        # (mock_config["strategies"] legacy; registry has 5)
+        self.assertEqual(sorted(self.engine.strategy_names), sorted([
+            "AlwaysCooperate", "AlwaysDefect", "TitForTat", "GrimTrigger", "ForgivingTitForTat"
+        ]))
         self.assertEqual(self.engine.default_rounds, 2)
 
     @patch('engine.GameTheoryEngine._get_human_move')

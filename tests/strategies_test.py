@@ -5,11 +5,14 @@ import sys
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+# Import from strategies package (auto-discovery from system/ + custom/)
+# Includes ForgivingTitForTat from custom/
 from strategies import (
     AlwaysCooperate,
     AlwaysDefect,
     TitForTat,
     GrimTrigger,
+    ForgivingTitForTat,  # from custom/
     STRATEGY_REGISTRY,
     Strategy
 )
@@ -25,14 +28,28 @@ class TestStrategies(unittest.TestCase):
         self.grim_trigger = GrimTrigger()
 
     def test_strategy_registry(self):
-        """Test registry contains all strategies and maps to classes."""
-        expected = ['AlwaysCooperate', 'AlwaysDefect', 'TitForTat', 'GrimTrigger']
+        """Test registry contains all strategies and maps to classes.
+        Now dynamic from system/ + custom/ folders (5 total incl. ForgivingTitForTat).
+        """
+        # Expect built-in (4) + custom Forgiving
+        expected = ['AlwaysCooperate', 'AlwaysDefect', 'TitForTat', 'GrimTrigger', 'ForgivingTitForTat']
         self.assertEqual(sorted(STRATEGY_REGISTRY.keys()), sorted(expected))
-        # Verify instantiable
+        # Verify instantiable + source comment in doc
         for name, cls in STRATEGY_REGISTRY.items():
             self.assertTrue(issubclass(cls, Strategy))
             instance = cls()
             self.assertIsInstance(instance, Strategy)
+
+    def test_custom_strategy_forgiving_tit_for_tat(self):
+        """Test custom strat from custom/ folder (ForgivingTitForTat)."""
+        forgiver = ForgivingTitForTat()
+        # Start C
+        self.assertEqual(forgiver.decide([]), 'C')
+        # Mirror
+        self.assertEqual(forgiver.decide(['D']), 'D')
+        # Forgive after two D's
+        self.assertEqual(forgiver.decide(['D', 'D']), 'C')
+        self.assertEqual(forgiver.decide(['C', 'D', 'D']), 'C')
 
     def test_always_cooperate(self):
         """AlwaysCooperate: always returns 'C' regardless of history."""
