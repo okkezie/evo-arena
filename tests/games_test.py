@@ -61,5 +61,44 @@ class TestGame(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.game.validate_move('Cooperate')
 
+    def test_new_games_config_parsing(self):
+        """Test Hawk-Dove and Stag Hunt from config (desc, payoffs, valid_actions order for mapping)."""
+        # HD config snippet
+        hd_config = {
+            "payoffs": {
+                "('Dove', 'Dove')": [2, 2],
+                "('Dove', 'Hawk')": [1, 3],
+                "('Hawk', 'Dove')": [3, 1],
+                "('Hawk', 'Hawk')": [0, 0]
+            },
+            "valid_actions": ["Dove", "Hawk"],  # [0]=coop-like, [1]=defect-like
+            "description": "Hawk-Dove test"
+        }
+        hd_game = Game.from_config(hd_config)
+        self.assertEqual(hd_game.description, "Hawk-Dove test")
+        self.assertEqual(hd_game.valid_actions, ["Dove", "Hawk"])
+        self.assertEqual(hd_game.payoffs[('Dove', 'Hawk')], (1, 3))
+
+        # SH similar
+        sh_config = {
+            "payoffs": {
+                "('Stag', 'Stag')": [5, 5],
+                "('Stag', 'Hare')": [0, 3],
+                "('Hare', 'Stag')": [3, 0],
+                "('Hare', 'Hare')": [3, 3]
+            },
+            "valid_actions": ["Stag", "Hare"],
+            "description": "Stag Hunt test"
+        }
+        sh_game = Game.from_config(sh_config)
+        self.assertEqual(sh_game.valid_actions[0], "Stag")  # coop-like
+        self.assertEqual(sh_game.get_payoff('Stag', 'Hare'), (0, 3))
+
+    def test_game_description_fallback(self):
+        """Test desc from config or fallback; keeps generic."""
+        no_desc_config = {"payoffs": {"('X', 'Y')": [1, 1]}, "valid_actions": ["X", "Y"]}
+        g = Game.from_config(no_desc_config)
+        self.assertIn("Game payoff matrix", g.description)
+
 if __name__ == '__main__':
     unittest.main()

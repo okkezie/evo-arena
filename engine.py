@@ -30,9 +30,11 @@ class GameTheoryEngine:
         return STRATEGY_REGISTRY[name]()
 
     def _get_human_move(self, game: Game, player: str) -> str:
-        """Get validated move from human input via console."""
+        """Get validated move from human input via console.
+        Uses game's concrete valid_actions (e.g., ['Dove', 'Hawk']) for prompt.
+        """
         while True:
-            move = input(f"Player {player}'s move {game.valid_actions} (C/D for PD): ").strip().upper()
+            move = input(f"Player {player}'s move {game.valid_actions}: ").strip().capitalize()
             try:
                 game.validate_move(move)
                 return move
@@ -42,20 +44,40 @@ class GameTheoryEngine:
     def _noisy_decide(self, strat: Strategy, opp_history: List[str], noise: float = 0.0) -> str:
         """
         Get strategy's move with optional noise (0-0.2 prob to flip to other action).
-        Handles edge for extensibility (assumes binary actions like PD).
+        Returns abstract 'C' (coop-like) or 'D' (defect-like) for strategy semantics.
+        (Concrete labels handled separately for display/payoffs.)
         """
         if not 0 <= noise <= 0.2:
             raise ValueError("Noise must be in [0, 0.2] for realistic error rates.")
+        # Strategies always decide in abstract ('C'/'D')
         move = strat.decide(opp_history)
         if noise > 0 and random.random() < noise:
-            # Flip to alternative valid action (game-agnostic for first game)
-            game = list(self.games.values())[0]  # default to PD or first
-            valid = game.valid_actions
-            other_moves = [a for a in valid if a != move]
-            if other_moves:
-                return other_moves[0]
-            return move  # fallback
+            # Flip abstract label (binary semantic, independent of concrete game labels)
+            return 'D' if move == 'C' else 'C'
         return move
+
+    def _abstract_to_concrete(self, game: Game, abstract_move: str) -> str:
+        """
+        Map internal abstract move ('C'=coop-like, 'D'=defect-like) to game's concrete label.
+        Assumes valid_actions[0]=coop semantic, [1]=defect (true for PD, HD=Dove/Hawk, SH=Stag/Hare).
+        Enables strategies to work unchanged on any 2x2 game.
+        """
+        if abstract_move == 'C':
+            return game.valid_actions[0]
+        elif abstract_move == 'D':
+            return game.valid_actions[1]
+        raise ValueError(f"Invalid abstract move: {abstract_move}")
+
+    def _concrete_to_abstract(self, game: Game, concrete_move: str) -> str:
+        """
+        Reverse: concrete move (e.g., 'Hawk') to abstract ('D') for opp_history passed to strats.
+        Keeps strategy logic (e.g., TitForTat mirrors 'D') semantic, not label-specific.
+        """
+        if concrete_move == game.valid_actions[0]:
+            return 'C'
+        elif concrete_move == game.valid_actions[1]:
+            return 'D'
+        raise ValueError(f"Invalid concrete move: {concrete_move} for game actions {game.valid_actions}")
 
     def _play_match(
         self,
@@ -79,29 +101,41 @@ class GameTheoryEngine:
         strat1 = self._get_strategy(strat1_name)
         strat2 = self._get_strategy(strat2_name)
 
+        # Concrete moves (game-specific labels e.g., 'Hawk', 'Stag') for payoffs/validate/output
         p1_moves: List[str] = []
         p2_moves: List[str] = []
+        # Abstract opp histories ('C'=coop-like, 'D'=defect-like) for strats (unchanged logic)
+        # Ensures TitForTat/Grim etc. work on any game via semantic mapping
+        p1_opp_history_abstract: List[str] = []  # P2's abstracts seen by strat1
+        p2_opp_history_abstract: List[str] = []  # P1's abstracts seen by strat2
         p1_score = 0
         p2_score = 0
-        move_history: List[Tuple[str, str]] = []
+        move_history: List[Tuple[str, str]] = []  # concrete tuples
 
         if verbose:
-            print(f"\n=== Match: {strat1_name} vs {strat2_name} | Rounds: {rounds} | Noise: {noise} ===")
+            print(f"\n=== Match: {strat1_name} vs {strat2_name} | Rounds: {rounds} | Noise: {noise} | Game: {game_name} ===")
+            print(game.description)  # one-line game desc
 
         for round_num in range(1, rounds + 1):
-            # Noisy decisions
-            p1_move = self._noisy_decide(strat1, p2_moves, noise)
-            p2_move = self._noisy_decide(strat2, p1_moves, noise)
+            # Noisy decisions in abstract ('C'/'D' semantic)
+            abstract_p1 = self._noisy_decide(strat1, p1_opp_history_abstract, noise)
+            p1_move = self._abstract_to_concrete(game, abstract_p1)  # e.g., 'Hawk'
+            abstract_p2 = self._noisy_decide(strat2, p2_opp_history_abstract, noise)
+            p2_move = self._abstract_to_concrete(game, abstract_p2)  # e.g., 'Dove'
 
-            # Update histories/moves
+            # Update concrete for record/output
             p1_moves.append(p1_move)
             p2_moves.append(p2_move)
             move_history.append((p1_move, p2_move))
 
-            # Payoffs
+            # Payoffs use concrete labels (from config)
             payoff = game.get_payoff(p1_move, p2_move)
             p1_score += payoff[0]
             p2_score += payoff[1]
+
+            # Update abstract opp histories for next strat decides (semantic only)
+            p1_opp_history_abstract.append(abstract_p2)  # P1 sees P2's abstract
+            p2_opp_history_abstract.append(abstract_p1)  # P2 sees P1's abstract
 
             if verbose:
                 print(f"Round {round_num}: P1={p1_move}({strat1_name}), P2={p2_move}({strat2_name}) | "
@@ -157,14 +191,21 @@ class GameTheoryEngine:
         if mode not in [0, 1, 2]:
             raise ValueError("Mode must be 0 (auto), 1 (single), 2 (multi)")
 
-        # Histories: list of opponent's moves for each player's strategy
-        p1_moves: List[str] = []  # for P2's opp history
-        p2_moves: List[str] = []  # for P1's opp history
+        # Print game description (for PD/HD/SH)
+        print(f"\n=== Starting {game_name} | Mode: {mode} | Rounds: {rounds} ===")
+        print(game.description)
+
+        # For AI players: use abstract histories ('C' coop, 'D' defect semantic) so strats unchanged
+        # Concrete moves/labels (e.g., 'Hawk') for payoff/validate/print/human input
+        # Histories concrete only for record (p1_moves etc.); mapping ensures compatibility
+        p1_moves: List[str] = []  # concrete
+        p2_moves: List[str] = []  # concrete
+        p1_opp_history_abstract: List[str] = []  # for strat1
+        p2_opp_history_abstract: List[str] = []  # for strat2
         p1_score = 0
         p2_score = 0
         move_history: List[Tuple[str, str]] = []
 
-        print(f"\n=== Starting {game_name} | Mode: {mode} | Rounds: {rounds} ===")
         if mode == 0:
             print(f"AI1: {strat1_name} vs AI2: {strat2_name}")
         elif mode == 1:
@@ -174,27 +215,38 @@ class GameTheoryEngine:
 
         for round_num in range(1, rounds + 1):
             # Determine moves based on mode
-            if mode == 0:  # auto AI vs AI
-                p1_move = strat1.decide(p2_moves)  # P1 sees P2's previous moves
-                p2_move = strat2.decide(p1_moves)
-            elif mode == 1:  # human P1 vs AI P2
-                p1_move = self._get_human_move(game, "1")
-                p2_move = strat2.decide(p1_moves)
-            elif mode == 2:  # multi human vs human
+            if mode == 0:  # auto AI vs AI - abstract for strats
+                abstract_p1 = strat1.decide(p2_opp_history_abstract)  # P1 sees P2 abstract
+                p1_move = self._abstract_to_concrete(game, abstract_p1)
+                abstract_p2 = strat2.decide(p1_opp_history_abstract)
+                p2_move = self._abstract_to_concrete(game, abstract_p2)
+            elif mode == 1:  # human P1 (concrete) vs AI P2 (abstract)
+                p1_move = self._get_human_move(game, "1")  # concrete
+                abstract_p1 = self._concrete_to_abstract(game, p1_move)
+                abstract_p2 = strat2.decide(p1_opp_history_abstract)
+                p2_move = self._abstract_to_concrete(game, abstract_p2)
+            elif mode == 2:  # multi human - concrete only
                 p1_move = self._get_human_move(game, "1")
                 p2_move = self._get_human_move(game, "2")
+                # Abstract not needed for humans
 
-            # Record moves and update histories
+            # Record concrete moves
             p1_moves.append(p1_move)
             p2_moves.append(p2_move)
             move_history.append((p1_move, p2_move))
 
-            # Get payoffs and update scores
+            # Update abstract opp histories for AI strats (semantic)
+            if mode in (0, 1):  # P1 AI?
+                p2_opp_history_abstract.append(self._concrete_to_abstract(game, p2_move))
+            if mode in (0, 1):  # P2 AI
+                p1_opp_history_abstract.append(self._concrete_to_abstract(game, p1_move))
+
+            # Get payoffs (concrete) and update scores
             payoff = game.get_payoff(p1_move, p2_move)
             p1_score += payoff[0]
             p2_score += payoff[1]
 
-            # Print turn result
+            # Print turn result (concrete labels)
             print(f"Round {round_num}: P1={p1_move}, P2={p2_move} | Payoffs=({payoff[0]}, {payoff[1]}) | Scores=(P1:{p1_score}, P2:{p2_score})")
 
         print(f"\n=== Game Over === Final Scores: P1={p1_score}, P2={p2_score}")

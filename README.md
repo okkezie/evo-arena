@@ -35,7 +35,7 @@ Run via `python main.py` and select sim type:
 ### 1. Single Repeated Match (type=1)
 - AI vs AI (e.g., TitForTat vs GrimTrigger)
 - Default 100 rounds; optional noise (0-0.2) randomly flips moves
-- Prints per-round moves/payoffs/totals + summary
+- Prints per-round moves/payoffs/totals + summary (concrete labels e.g., Hawk)
 - Example: `...` → detailed console output
 
 ### 2. Round-Robin Tournament (type=2)
@@ -51,6 +51,13 @@ Run via `python main.py` and select sim type:
 - Per-gen stats (best/avg fitness, strat freqs)
 - Final ranking + winner; optional matplotlib freq plot
 - Tuned for speed (short matches, sampling)
+
+## Supported Games
+All features (matches, tournaments, evolution) work on any config game:
+- **PD** (default): C/D, mutual coop dilemma.
+- **HawkDove**: Dove/Hawk, aggression contest (mixed ESS).
+- **StagHunt**: Stag/Hare, coordination risk.
+Select in menu; outputs use game-specific labels; strats map semantically (C=coop-like=valid[0], D=defect-like=valid[1]).
 
 ## Updated Testing Guide
 - **New Features Console Tests** (use venv for DEAP/numpy/matplotlib):

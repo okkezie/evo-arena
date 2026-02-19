@@ -17,7 +17,8 @@ class TestGameTheoryEngine(unittest.TestCase):
 
     def setUp(self):
         """Setup engine with config (mocked for isolation)."""
-        # Mock config.json content to avoid file dep in tests
+        # Mock config.json content (incl. HawkDove/StagHunt) to avoid file dep + test new games
+        # valid_actions[0]=coop-semantic 'C', [1]=defect 'D' for mapping
         self.mock_config = {
             "games": {
                 "PD": {
@@ -27,7 +28,28 @@ class TestGameTheoryEngine(unittest.TestCase):
                         "('D', 'C')": [5, 0],
                         "('D', 'D')": [1, 1]
                     },
-                    "valid_actions": ["C", "D"]
+                    "valid_actions": ["C", "D"],
+                    "description": "PD test"
+                },
+                "HawkDove": {
+                    "payoffs": {
+                        "('Dove', 'Dove')": [2, 2],
+                        "('Dove', 'Hawk')": [1, 3],
+                        "('Hawk', 'Dove')": [3, 1],
+                        "('Hawk', 'Hawk')": [0, 0]
+                    },
+                    "valid_actions": ["Dove", "Hawk"],
+                    "description": "HD test"
+                },
+                "StagHunt": {
+                    "payoffs": {
+                        "('Stag', 'Stag')": [5, 5],
+                        "('Stag', 'Hare')": [0, 3],
+                        "('Hare', 'Stag')": [3, 0],
+                        "('Hare', 'Hare')": [3, 3]
+                    },
+                    "valid_actions": ["Stag", "Hare"],
+                    "description": "SH test"
                 }
             },
             "strategies": ["AlwaysCooperate", "AlwaysDefect", "TitForTat", "GrimTrigger"],
@@ -44,11 +66,17 @@ class TestGameTheoryEngine(unittest.TestCase):
         self.config_patcher.stop()
 
     def test_config_load(self):
-        """Test engine init loads games, strategies, default_rounds from config."""
-        self.assertIn('PD', self.engine.games)
-        # Verify it's a Game instance (from games.py)
-        self.assertIsInstance(self.engine.games['PD'], Game)
-        self.assertEqual(self.engine.strategy_names, self.mock_config['strategies'])
+        """Test engine init loads games, strategies, default_rounds from config.
+        Now includes HawkDove/StagHunt + descriptions for multi-game support.
+        """
+        # All 3 games loaded
+        self.assertEqual(set(self.engine.games.keys()), {"PD", "HawkDove", "StagHunt"})
+        # Verify Game instance + desc
+        self.assertIsInstance(self.engine.games["PD"], Game)
+        self.assertIsInstance(self.engine.games["HawkDove"], Game)
+        self.assertIn("PD test", self.engine.games["PD"].description)
+        self.assertIn("HD test", self.engine.games["HawkDove"].description)
+        self.assertEqual(self.engine.strategy_names, self.mock_config["strategies"])
         self.assertEqual(self.engine.default_rounds, 2)
 
     @patch('engine.GameTheoryEngine._get_human_move')
@@ -170,6 +198,20 @@ class TestGameTheoryEngine(unittest.TestCase):
         self.assertEqual(len(result["total_scores"]), 4)
         # Called 4*4 =16 times (full matrix)
         self.assertEqual(mock_match.call_count, 16)
+
+    def test_mapping_helpers(self):
+        """Test abstract <-> concrete mapping for new games (HD/SH); ensures strats unchanged."""
+        # HD: [0]='Dove'=C coop-like, [1]='Hawk'=D
+        hd_game = self.engine.games["HawkDove"]
+        self.assertEqual(self.engine._abstract_to_concrete(hd_game, "C"), "Dove")
+        self.assertEqual(self.engine._abstract_to_concrete(hd_game, "D"), "Hawk")
+        self.assertEqual(self.engine._concrete_to_abstract(hd_game, "Hawk"), "D")
+        self.assertEqual(self.engine._concrete_to_abstract(hd_game, "Dove"), "C")
+
+        # SH: [0]='Stag'=C, [1]='Hare'=D
+        sh_game = self.engine.games["StagHunt"]
+        self.assertEqual(self.engine._abstract_to_concrete(sh_game, "C"), "Stag")
+        self.assertEqual(self.engine._concrete_to_abstract(sh_game, "Hare"), "D")
 
     @unittest.skipIf(
         importlib.util.find_spec("deap") is None,

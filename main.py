@@ -12,13 +12,17 @@ if __name__ == "__main__":
     print("=== EvoArena: Game Theory Simulator ===")
     engine = GameTheoryEngine()
 
-    # Game selection (extensible via config.json)
+    # Game selection (extensible via config.json; now supports PD, Hawk-Dove, Stag Hunt)
     available_games = list(engine.games.keys())
     print(f"Available games: {available_games}")
     game_name = input(f"Select game (default: PD): ").strip() or "PD"
     if game_name not in available_games:
         print(f"Invalid game. Defaulting to PD.")
         game_name = "PD"
+
+    # Print game description (one-line overview)
+    game = engine.games[game_name]
+    print(f"\nSelected Game: {game_name} - {game.description}")
 
     # Simulation type selection
     print("\nSimulation Types:")
