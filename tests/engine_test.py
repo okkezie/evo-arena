@@ -133,5 +133,56 @@ class TestGameTheoryEngine(unittest.TestCase):
             self.engine.play_game('PD', mode=0, strat1_name='NonExistent', strat2_name='TitForTat')
         self.assertIn("Unknown strategy", str(cm.exception))
 
+    def test_noisy_decide(self):
+        """Test noise utility: flips move with prob, within 0-0.2."""
+        strat = self.engine._get_strategy('AlwaysCooperate')  # always 'C'
+        # noise=0: always 'C'
+        self.assertEqual(self.engine._noisy_decide(strat, []), 'C')
+        # With noise=0.2: may flip to 'D', but probabilistic; test range
+        # For determinism in test, mock random
+        with patch('engine.random.random', return_value=0.3):  # >0.2 no flip
+            self.assertEqual(self.engine._noisy_decide(strat, [], noise=0.2), 'C')
+        with patch('engine.random.random', return_value=0.1):  # < flip to 'D'
+            self.assertEqual(self.engine._noisy_decide(strat, [], noise=0.2), 'D')
+        # Invalid noise
+        with self.assertRaises(ValueError):
+            self.engine._noisy_decide(strat, [], noise=0.3)
+
+    @patch('engine.GameTheoryEngine._play_match')
+    def test_repeated_match(self, mock_match):
+        """Test single repeated match feature (wraps _play_match)."""
+        mock_match.return_value = {"scores": (300, 100), "strats": ("TitForTat", "AlwaysDefect")}
+        result = self.engine.repeated_match(strat1_name="TitForTat", strat2_name="AlwaysDefect", rounds=100, noise=0.01)
+        mock_match.assert_called_once()
+        self.assertEqual(result["scores"], (300, 100))
+
+    @patch('engine.GameTheoryEngine._play_match')
+    def test_round_robin_tournament(self, mock_match):
+        """Test tournament: calls _play_match for all pairs, produces ranking."""
+        # Mock returns for simplicity (e.g., always 300-0 for first strat)
+        mock_match.return_value = {"scores": (300, 100)}
+        result = self.engine.round_robin_tournament(rounds_per_match=10, repeats=1, noise=0)
+        self.assertIn("total_scores", result)
+        self.assertIn("ranking", result)
+        # With 4 strats, expect ranking dict
+        self.assertEqual(len(result["total_scores"]), 4)
+        # Called 4*4 =16 times (full matrix)
+        self.assertEqual(mock_match.call_count, 16)
+
+    @patch('matplotlib.pyplot.show')
+    @patch('engine.GameTheoryEngine._play_match')
+    def test_evolutionary_simulation(self, mock_match, mock_plot):
+        """Test DEAP evo: runs GA, stats, freqs, plot; small params for speed."""
+        # Mock match returns positive score
+        mock_match.return_value = {"scores": (100, 0)}
+        result = self.engine.evolutionary_simulation(
+            pop_size=20, generations=2, rounds_per_match=10, noise=0, plot=True
+        )
+        self.assertIn("winner", result)
+        self.assertIn("final_ranking", result)
+        self.assertTrue(mock_plot.called)  # plot attempted
+        # _play_match called multiple times in fitness evals
+        self.assertGreater(mock_match.call_count, 0)
+
 if __name__ == '__main__':
     unittest.main()

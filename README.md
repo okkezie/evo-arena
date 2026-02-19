@@ -28,3 +28,40 @@ python main.py
 - `0`: Auto (0 humans) - AI vs AI, observer mode
 - `1`: Single (1 human) - Human (P1 input) vs AI
 - `2`: Multi (2 humans) - Alternating console inputs
+
+## New Simulation Features
+Run via `python main.py` and select sim type:
+
+### 1. Single Repeated Match (type=1)
+- AI vs AI (e.g., TitForTat vs GrimTrigger)
+- Default 100 rounds; optional noise (0-0.2) randomly flips moves
+- Prints per-round moves/payoffs/totals + summary
+- Example: `...` → detailed console output
+
+### 2. Round-Robin Tournament (type=2)
+- All strategies vs all others (incl. self-matches)
+- Uses match logic internally (no per-round spam)
+- Config: rounds/match (100), repeats (avg), noise
+- Outputs ranked leaderboard by total points
+- Fast even with repeats
+
+### 3. Evolutionary Simulation (type=3, uses DEAP)
+- Population of agents (50-150) evolving strategy genes
+- Fitness from tournaments; standard GA (sel/cx/mut)
+- Per-gen stats (best/avg fitness, strat freqs)
+- Final ranking + winner; optional matplotlib freq plot
+- Tuned for speed (short matches, sampling)
+
+## Updated Testing Guide
+- **New Features Console Tests**:
+  - Repeated: sim=1, strats=TitForTat/AlwaysDefect, noise=0.1
+  - Tournament: sim=2, repeats=1
+  - Evo: sim=3, pop=50, gens=20 (check plot/stats)
+- **Edge Cases**: noise>0.2 error, small pop for evo, invalid strats
+- Unit tests now cover: `python -m unittest tests.engine_test` (noise, sims)
+- Run in venv: `source venv/bin/activate && python main.py`
+
+## Extensibility
+- Add new games: Extend `"games"` section in `config.json` with payoffs and valid_actions
+- New strategies: Implement subclass of `Strategy` in `strategies.py` and register in `STRATEGY_REGISTRY`
+- DEAP evolution: Customize toolbox/ fitness in engine.evolutionary_simulation for advanced (e.g., more complex GA)
